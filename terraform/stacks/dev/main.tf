@@ -154,7 +154,7 @@ module "ecs_web" {
   log_group_name = module.logs_web.log_group_name
 
   container = {
-    image  = "${module.ecr_web.repository_url}:latest"
+    image  = "${module.ecr_web.repository_url}:dev-latest"
     port   = local.app_port
     cpu    = 256
     memory = 512
@@ -179,6 +179,8 @@ module "ecs_web" {
     target_group_arn = module.alb_target_web.arn
     container_port   = local.app_port
   }
+
+  secrets_arns = [data.aws_secretsmanager_secret.web.arn]
 
   task_inline_policy_json = data.aws_iam_policy_document.ecs_task_policy.json
 
