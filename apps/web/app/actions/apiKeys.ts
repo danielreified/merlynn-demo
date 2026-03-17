@@ -1,11 +1,16 @@
 "use server";
 
 import { randomBytes, createHash } from "crypto";
-import { connectDB, ApiKey } from "@merlynn/db";
 import { auth } from "@/lib/auth";
 
 function hashKey(key: string): string {
   return createHash("sha256").update(key).digest("hex");
+}
+
+async function getDb() {
+  const { connectDB, ApiKey } = await import("@merlynn/db");
+  await connectDB();
+  return { ApiKey };
 }
 
 interface CreateKeyResult {
@@ -16,29 +21,14 @@ interface CreateKeyResult {
 }
 
 export async function createApiKey(name: string): Promise<CreateKeyResult> {
-  let session;
-  try {
-    console.log("[createApiKey] calling auth()...");
-    session = await auth();
-    console.log("[createApiKey] auth() returned, user:", session?.user?.id ?? "null");
-  } catch (e) {
-    console.error("createApiKey auth() error:", e);
-    return { success: false, error: "Authentication check failed" };
-  }
+  const session = await auth();
   if (!session?.user?.id) return { success: false, error: "Not authenticated" };
 
   if (!name || name.trim().length === 0) {
     return { success: false, error: "Name is required" };
   }
 
-  try {
-    console.log("[createApiKey] connecting to DB...");
-    await connectDB();
-    console.log("[createApiKey] DB connected");
-  } catch (e) {
-    console.error("createApiKey connectDB() error:", e);
-    return { success: false, error: "Database connection failed" };
-  }
+  const { ApiKey } = await getDb();
 
   // Generate a key: mk_live_ + 32 random hex chars
   const rawKey = `mk_live_${randomBytes(24).toString("hex")}`;
@@ -60,7 +50,7 @@ export async function revokeApiKey(keyId: string): Promise<{ success: boolean; e
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: "Not authenticated" };
 
-  await connectDB();
+  const { ApiKey } = await getDb();
 
   const result = await ApiKey.findOneAndUpdate(
     { _id: keyId, createdBy: session.user.id },
@@ -76,7 +66,7 @@ export async function listApiKeys() {
   const session = await auth();
   if (!session?.user?.id) return [];
 
-  await connectDB();
+  const { ApiKey } = await getDb();
 
   const keys = await ApiKey.find({ createdBy: session.user.id })
     .sort({ createdAt: -1 })

@@ -1,20 +1,25 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { connectDB, DecisionModel } from "@merlynn/db";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ModelData = Record<string, any>;
 
-export async function listModels(): Promise<ModelData[]> {
+async function getDb() {
+  const { connectDB, DecisionModel } = await import("@merlynn/db");
   await connectDB();
+  return { DecisionModel };
+}
+
+export async function listModels(): Promise<ModelData[]> {
+  const { DecisionModel } = await getDb();
   const models = await DecisionModel.find().sort({ updatedAt: -1 }).lean();
   return JSON.parse(JSON.stringify(models));
 }
 
 export async function getModel(id: string): Promise<ModelData | null> {
   if (!/^[a-f\d]{24}$/i.test(id)) return null;
-  await connectDB();
+  const { DecisionModel } = await getDb();
   const model = await DecisionModel.findById(id).lean();
   if (!model) return null;
   return JSON.parse(JSON.stringify(model));
@@ -26,7 +31,7 @@ export async function createModel(data: {
   edges?: unknown[];
 }): Promise<{ success: boolean; model?: ModelData; error?: string }> {
   try {
-    await connectDB();
+    const { DecisionModel } = await getDb();
     const model = await DecisionModel.create({
       ...data,
       nodes: data.nodes ?? [],
@@ -50,7 +55,7 @@ export async function updateModel(
     if (!/^[a-f\d]{24}$/i.test(id)) {
       return { success: false, error: "Invalid model ID" };
     }
-    await connectDB();
+    const { DecisionModel } = await getDb();
     const model = await DecisionModel.findByIdAndUpdate(id, updates, {
       new: true,
       runValidators: true,
@@ -70,7 +75,7 @@ export async function deleteModel(id: string): Promise<{ success: boolean; error
     if (!/^[a-f\d]{24}$/i.test(id)) {
       return { success: false, error: "Invalid model ID" };
     }
-    await connectDB();
+    const { DecisionModel } = await getDb();
     const model = await DecisionModel.findByIdAndDelete(id).lean();
     if (!model) return { success: false, error: "Model not found" };
     revalidatePath("/models");
