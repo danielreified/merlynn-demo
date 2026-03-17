@@ -1,9 +1,6 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { compare } from "bcryptjs";
-import { connectDB, User } from "@merlynn/db";
-import type { UserRole } from "@merlynn/db";
-import { seedUsers } from "./seed";
+type UserRole = "ANALYST" | "ADMIN";
 
 declare module "next-auth" {
   interface Session {
@@ -36,6 +33,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!credentials?.email || !credentials?.password) {
           return null;
         }
+
+        // Dynamic imports to avoid pulling mongoose into Edge Runtime
+        const { compare } = await import("bcryptjs");
+        const { connectDB, User } = await import("@merlynn/db");
+        const { seedUsers } = await import("./seed");
 
         await connectDB();
         await seedUsers();
