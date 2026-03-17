@@ -12,6 +12,7 @@ env:
   AWS_REGION: af-south-1
 
 jobs:
+  # ─── CI ───────────────────────────────────────────────────
   lint:
     name: Lint & Format
     runs-on: ubuntu-latest
@@ -41,13 +42,16 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun test --cwd packages/db
 
-  deploy-web:
-    name: Deploy Web App
+  # ─── Build ────────────────────────────────────────────────
+  build-web:
+    name: Build & Push Image
     runs-on: ubuntu-latest
     needs: [lint, typecheck, test-db]
     permissions:
       id-token: write
       contents: read
+    outputs:
+      image: ${{ steps.image.outputs.uri }}
     steps:
       - uses: actions/checkout@v4
 
@@ -61,20 +65,36 @@ jobs:
         id: ecr
 
       - name: Build and push Docker image
+        id: image
         env:
           ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          IMAGE_URI=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker build -t $IMAGE_URI -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          docker push $IMAGE_URI
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "uri=$IMAGE_URI" >> $GITHUB_OUTPUT
 
-      - name: Deploy to ECS
+  # ─── Deploy ───────────────────────────────────────────────
+  deploy-web:
+    name: Deploy Web App
+    runs-on: ubuntu-latest
+    needs: [build-web]
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update ECS service
         env:
           ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
           ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
         run: |
+          echo "Deploying image: ${{ needs.build-web.outputs.image }}"
           aws ecs update-service \
             --cluster $ECS_CLUSTER \
             --service $ECS_SERVICE \
