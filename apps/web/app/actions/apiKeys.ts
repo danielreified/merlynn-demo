@@ -1,16 +1,11 @@
 "use server";
 
 import { randomBytes, createHash } from "crypto";
+import { connectDB, ApiKey } from "@merlynn/db";
 import { auth } from "@/lib/auth";
 
 function hashKey(key: string): string {
   return createHash("sha256").update(key).digest("hex");
-}
-
-async function getDb() {
-  const { connectDB, ApiKey } = await import("@merlynn/db");
-  await connectDB();
-  return { ApiKey };
 }
 
 interface CreateKeyResult {
@@ -28,7 +23,7 @@ export async function createApiKey(name: string): Promise<CreateKeyResult> {
     return { success: false, error: "Name is required" };
   }
 
-  const { ApiKey } = await getDb();
+  await connectDB();
 
   // Generate a key: mk_live_ + 32 random hex chars
   const rawKey = `mk_live_${randomBytes(24).toString("hex")}`;
@@ -50,7 +45,7 @@ export async function revokeApiKey(keyId: string): Promise<{ success: boolean; e
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: "Not authenticated" };
 
-  const { ApiKey } = await getDb();
+  await connectDB();
 
   const result = await ApiKey.findOneAndUpdate(
     { _id: keyId, createdBy: session.user.id },
@@ -66,7 +61,7 @@ export async function listApiKeys() {
   const session = await auth();
   if (!session?.user?.id) return [];
 
-  const { ApiKey } = await getDb();
+  await connectDB();
 
   const keys = await ApiKey.find({ createdBy: session.user.id })
     .sort({ createdAt: -1 })

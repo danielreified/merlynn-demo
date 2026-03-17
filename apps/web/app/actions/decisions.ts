@@ -1,21 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { IDecision, TransactionType } from "@merlynn/db";
+import Papa from "papaparse";
+import { connectDB, Decision, type IDecision, type TransactionType } from "@merlynn/db";
+import { ensureSeeded } from "@/lib/db";
 import { simulateRiskAssessment } from "@/lib/risk";
-
-async function getDb() {
-  const { connectDB, Decision } = await import("@merlynn/db");
-  await connectDB();
-  return { Decision };
-}
-
-async function getDbSeeded() {
-  const { ensureSeeded } = await import("@/lib/db");
-  await ensureSeeded();
-  const { Decision } = await import("@merlynn/db");
-  return { Decision };
-}
 
 /* ---------- List decisions with pagination & filters ---------- */
 
@@ -37,7 +26,7 @@ export interface DecisionsListResult {
 }
 
 export async function listDecisions(filters: DecisionFilters = {}): Promise<DecisionsListResult> {
-  const { Decision } = await getDbSeeded();
+  await ensureSeeded();
 
   const page = Math.max(1, parseInt(filters.page ?? "1", 10));
   const limit = Math.max(1, Math.min(100, parseInt(filters.limit ?? "20", 10)));
@@ -80,8 +69,7 @@ export async function exportDecisions(
   filters: DecisionFilters = {},
   format: "csv" | "json" = "csv"
 ): Promise<{ data: string; format: "csv" | "json" }> {
-  const { Decision } = await getDbSeeded();
-  const Papa = (await import("papaparse")).default;
+  await ensureSeeded();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const filter: Record<string, any> = {};
@@ -159,7 +147,7 @@ export async function createDecision(
       };
     }
 
-    const { Decision } = await getDb();
+    await connectDB();
 
     const assessment = simulateRiskAssessment({
       amount,
@@ -191,7 +179,7 @@ export async function createDecision(
 }
 
 export async function getDecisionsByRisk(riskLevel?: string): Promise<IDecision[]> {
-  const { Decision } = await getDb();
+  await connectDB();
   const filter: Record<string, string> = {};
   if (riskLevel && ["HIGH", "MEDIUM", "LOW"].includes(riskLevel)) {
     filter.riskLevel = riskLevel;
@@ -211,7 +199,7 @@ export async function submitFeedback(
   note?: string
 ): Promise<FeedbackState> {
   try {
-    const { Decision } = await getDb();
+    await connectDB();
 
     const validRatings = ["CORRECT", "PARTIAL", "INCORRECT"];
     if (!validRatings.includes(rating)) {

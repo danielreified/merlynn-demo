@@ -38,40 +38,6 @@ export interface IModel {
 
 export interface IModelDocument extends IModel, Document {}
 
-const NodeSchema = new Schema<IModelNode>(
-  {
-    id: { type: String, required: true },
-    type: {
-      type: String,
-      required: true,
-      enum: ["factor", "decision", "output"],
-    },
-    label: { type: String, required: true, trim: true },
-    position: {
-      x: { type: Number, required: true },
-      y: { type: Number, required: true },
-    },
-    data: {
-      description: { type: String },
-      weight: { type: Number },
-      threshold: { type: Number },
-      riskLevel: { type: String },
-      options: { type: [String], default: undefined },
-    },
-  },
-  { _id: false }
-);
-
-const EdgeSchema = new Schema<IModelEdge>(
-  {
-    id: { type: String, required: true },
-    source: { type: String, required: true },
-    target: { type: String, required: true },
-    label: { type: String },
-  },
-  { _id: false }
-);
-
 const ModelSchema = new Schema<IModelDocument>(
   {
     name: {
@@ -91,12 +57,12 @@ const ModelSchema = new Schema<IModelDocument>(
       default: "draft",
     },
     nodes: {
-      type: [NodeSchema],
+      type: [Schema.Types.Mixed] as unknown as IModelNode[],
       required: true,
       default: [],
     },
     edges: {
-      type: [EdgeSchema],
+      type: [Schema.Types.Mixed] as unknown as IModelEdge[],
       required: true,
       default: [],
     },
