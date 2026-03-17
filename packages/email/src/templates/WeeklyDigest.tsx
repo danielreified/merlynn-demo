@@ -62,7 +62,7 @@ export const WeeklyDigest: React.FC<Readonly<WeeklyDigestProps>> = ({
     <Html>
       <Head />
       <Preview>
-        Weekly Risk Digest — {stats.totalDecisions} decisions processed, {stats.highRisk} high-risk
+        {`Weekly Risk Digest — ${stats.totalDecisions} decisions processed, ${stats.highRisk} high-risk`}
       </Preview>
       <Body style={main}>
         <Container style={container}>

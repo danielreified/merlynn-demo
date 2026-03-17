@@ -32,6 +32,13 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ["node_modules/**", ".next/**", "dist/**", ".turbo/**", "storybook-static/**", "**/next-env.d.ts"],
+    ignores: [
+      "node_modules/**",
+      ".next/**",
+      "dist/**",
+      ".turbo/**",
+      "storybook-static/**",
+      "**/next-env.d.ts",
+    ],
   }
 );
