@@ -1,20 +1,18 @@
 "use client";
 
-import React, { useCallback, useState, Suspense } from "react";
+import React, { useCallback, useState, useEffect, useTransition, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Badge } from "@merlynn/ui";
 import { FilterBar, type FilterValues } from "@/components/decisions/FilterBar";
 import { Pagination } from "@/components/decisions/Pagination";
-import type { IDecision, RiskLevel, FeedbackRating } from "@merlynn/db";
-
-interface DecisionsResponse {
-  decisions: (IDecision & { _id: string })[];
-  total: number;
-  page: number;
-  totalPages: number;
-}
+import {
+  listDecisions,
+  exportDecisions,
+  type DecisionsListResult,
+  type DecisionFilters,
+} from "@/app/actions/decisions";
+import type { RiskLevel, FeedbackRating } from "@merlynn/db";
 
 const LIMIT = 20;
 
@@ -55,6 +53,7 @@ function riskBadgeVariant(level: RiskLevel): "high" | "medium" | "low" {
 function DecisionsPageInner(): React.JSX.Element {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   const filters: FilterValues = {
     search: searchParams.get("search") ?? "",
@@ -65,6 +64,52 @@ function DecisionsPageInner(): React.JSX.Element {
   };
 
   const page = parseInt(searchParams.get("page") ?? "1", 10);
+
+  const [data, setData] = useState<DecisionsListResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  // Fetch decisions via server action
+  useEffect(() => {
+    let cancelled = false;
+
+    const actionFilters: DecisionFilters = {
+      page: String(page),
+      limit: String(LIMIT),
+    };
+    if (filters.riskLevel && filters.riskLevel !== "ALL")
+      actionFilters.riskLevel = filters.riskLevel;
+    if (filters.search) actionFilters.search = filters.search;
+    if (filters.modelName && filters.modelName !== "ALL")
+      actionFilters.modelName = filters.modelName;
+    if (filters.dateFrom) actionFilters.dateFrom = filters.dateFrom;
+    if (filters.dateTo) actionFilters.dateTo = filters.dateTo;
+
+    startTransition(async () => {
+      try {
+        const result = await listDecisions(actionFilters);
+        if (!cancelled) {
+          setData(result);
+          setError(null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError((e as Error).message);
+        }
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    page,
+    filters.riskLevel,
+    filters.search,
+    filters.modelName,
+    filters.dateFrom,
+    filters.dateTo,
+  ]);
 
   const setParams = useCallback(
     (updates: Record<string, string>) => {
@@ -95,40 +140,23 @@ function DecisionsPageInner(): React.JSX.Element {
     [setParams]
   );
 
-  const buildQueryString = useCallback(() => {
-    const params = new URLSearchParams();
-    params.set("page", String(page));
-    params.set("limit", String(LIMIT));
-    if (filters.riskLevel && filters.riskLevel !== "ALL")
-      params.set("riskLevel", filters.riskLevel);
-    if (filters.search) params.set("search", filters.search);
-    if (filters.modelName && filters.modelName !== "ALL")
-      params.set("modelName", filters.modelName);
-    if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
-    if (filters.dateTo) params.set("dateTo", filters.dateTo);
-    return params.toString();
-  }, [page, filters]);
-
-  const [exporting, setExporting] = useState(false);
-
   const handleExport = useCallback(
     async (format: "csv" | "json") => {
       setExporting(true);
       try {
-        const params = new URLSearchParams();
-        params.set("format", format);
+        const actionFilters: DecisionFilters = {};
         if (filters.riskLevel && filters.riskLevel !== "ALL")
-          params.set("riskLevel", filters.riskLevel);
-        if (filters.search) params.set("search", filters.search);
+          actionFilters.riskLevel = filters.riskLevel;
+        if (filters.search) actionFilters.search = filters.search;
         if (filters.modelName && filters.modelName !== "ALL")
-          params.set("modelName", filters.modelName);
-        if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
-        if (filters.dateTo) params.set("dateTo", filters.dateTo);
+          actionFilters.modelName = filters.modelName;
+        if (filters.dateFrom) actionFilters.dateFrom = filters.dateFrom;
+        if (filters.dateTo) actionFilters.dateTo = filters.dateTo;
 
-        const res = await fetch(`/api/decisions/export?${params.toString()}`);
-        if (!res.ok) throw new Error("Export failed");
-
-        const blob = await res.blob();
+        const result = await exportDecisions(actionFilters, format);
+        const blob = new Blob([result.data], {
+          type: format === "csv" ? "text/csv;charset=utf-8" : "application/json",
+        });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -142,14 +170,7 @@ function DecisionsPageInner(): React.JSX.Element {
     [filters]
   );
 
-  const { data, isLoading, error } = useQuery<DecisionsResponse>({
-    queryKey: ["decisions", filters, page],
-    queryFn: async () => {
-      const res = await fetch(`/api/decisions?${buildQueryString()}`);
-      if (!res.ok) throw new Error("Failed to fetch decisions");
-      return res.json() as Promise<DecisionsResponse>;
-    },
-  });
+  const isLoading = isPending && !data;
 
   return (
     <div className="flex h-full flex-col overflow-hidden p-4 lg:p-6">
@@ -203,7 +224,7 @@ function DecisionsPageInner(): React.JSX.Element {
       {/* Error state */}
       {error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400">
-          Error loading decisions: {(error as Error).message}
+          Error loading decisions: {error}
         </div>
       )}
 

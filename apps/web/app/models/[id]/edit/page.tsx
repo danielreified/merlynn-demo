@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import type { Node, Edge } from "@xyflow/react";
 import { ModelCanvas } from "@/components/models/ModelCanvas";
 import { Badge } from "@merlynn/ui";
+import { getModel, updateModel } from "@/app/actions/models";
 
 interface ModelData {
   _id: string;
@@ -32,45 +32,41 @@ export default function EditModelPage(): React.JSX.Element {
   const params = useParams();
   const id = params.id as string;
 
+  const [model, setModel] = useState<ModelData | null>(null);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
   const nodesRef = useRef<Node[]>([]);
   const edgesRef = useRef<Edge[]>([]);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const {
-    data: model,
-    isLoading,
-    error,
-  } = useQuery<ModelData>({
-    queryKey: ["model", id],
-    queryFn: async () => {
-      const res = await fetch(`/api/models/${id}`);
-      if (!res.ok) throw new Error("Failed to fetch model");
-      return res.json() as Promise<ModelData>;
-    },
-  });
-
-  // Set name when model loads
+  // Fetch model via server action
   useEffect(() => {
-    if (model) {
-      setName(model.name);
-      nodesRef.current = model.nodes;
-      edgesRef.current = model.edges;
-    }
-  }, [model]);
+    startTransition(async () => {
+      try {
+        const data = await getModel(id);
+        if (data) {
+          setModel(data as unknown as ModelData);
+          setName(data.name);
+          nodesRef.current = data.nodes as Node[];
+          edgesRef.current = data.edges as Edge[];
+        } else {
+          setError("Model not found");
+        }
+      } catch (e) {
+        setError((e as Error).message);
+      }
+    });
+  }, [id]);
 
   const saveModel = useCallback(async () => {
     setSaving(true);
     try {
-      await fetch(`/api/models/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          nodes: nodesRef.current,
-          edges: edgesRef.current,
-        }),
+      await updateModel(id, {
+        name,
+        nodes: nodesRef.current,
+        edges: edgesRef.current,
       });
     } catch {
       // Could show error toast
@@ -113,7 +109,7 @@ export default function EditModelPage(): React.JSX.Element {
     };
   }, [name, model, saveModel]);
 
-  if (isLoading) {
+  if (isPending && !model) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-700 border-t-blue-500" />
@@ -125,7 +121,7 @@ export default function EditModelPage(): React.JSX.Element {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-sm text-red-400">
-          {error ? `Error: ${(error as Error).message}` : "Model not found"}
+          {error ?? "Model not found"}
         </div>
       </div>
     );

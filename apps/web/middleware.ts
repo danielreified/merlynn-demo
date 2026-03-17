@@ -15,10 +15,13 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  const isSecure = req.nextUrl.protocol === "https:";
+  const cookieName = isSecure ? "__Secure-authjs.session-token" : "authjs.session-token";
+
   const token = await getToken({
     req,
     secret: process.env.AUTH_SECRET,
-    cookieName: "__Secure-authjs.session-token",
+    cookieName,
   });
 
   if (!token) {

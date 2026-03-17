@@ -1,8 +1,118 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import Papa from "papaparse";
 import { connectDB, Decision, type IDecision, type TransactionType } from "@merlynn/db";
+import { ensureSeeded } from "@/lib/db";
 import { simulateRiskAssessment } from "@/lib/risk";
+
+/* ---------- List decisions with pagination & filters ---------- */
+
+export interface DecisionFilters {
+  page?: string;
+  limit?: string;
+  riskLevel?: string;
+  search?: string;
+  modelName?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface DecisionsListResult {
+  decisions: (IDecision & { _id: string })[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export async function listDecisions(filters: DecisionFilters = {}): Promise<DecisionsListResult> {
+  await ensureSeeded();
+
+  const page = Math.max(1, parseInt(filters.page ?? "1", 10));
+  const limit = Math.max(1, Math.min(100, parseInt(filters.limit ?? "20", 10)));
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const filter: Record<string, any> = {};
+
+  if (filters.riskLevel) filter.riskLevel = filters.riskLevel;
+  if (filters.search) {
+    const regex = { $regex: filters.search, $options: "i" };
+    filter.$or = [{ supplierName: regex }, { transactionId: regex }];
+  }
+  if (filters.modelName) filter.modelName = filters.modelName;
+  if (filters.dateFrom || filters.dateTo) {
+    filter.timestamp = {};
+    if (filters.dateFrom) filter.timestamp.$gte = new Date(filters.dateFrom);
+    if (filters.dateTo) {
+      const to = new Date(filters.dateTo);
+      to.setHours(23, 59, 59, 999);
+      filter.timestamp.$lte = to;
+    }
+  }
+
+  const total = await Decision.countDocuments(filter);
+  const totalPages = Math.ceil(total / limit);
+  const skip = (page - 1) * limit;
+
+  const decisions = await Decision.find(filter)
+    .sort({ timestamp: -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
+
+  return JSON.parse(JSON.stringify({ decisions, total, page, totalPages }));
+}
+
+/* ---------- Export decisions as CSV or JSON ---------- */
+
+export async function exportDecisions(
+  filters: DecisionFilters = {},
+  format: "csv" | "json" = "csv"
+): Promise<{ data: string; format: "csv" | "json" }> {
+  await ensureSeeded();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const filter: Record<string, any> = {};
+
+  if (filters.riskLevel) filter.riskLevel = filters.riskLevel;
+  if (filters.search) {
+    const regex = { $regex: filters.search, $options: "i" };
+    filter.$or = [{ supplierName: regex }, { transactionId: regex }];
+  }
+  if (filters.modelName) filter.modelName = filters.modelName;
+  if (filters.dateFrom || filters.dateTo) {
+    filter.timestamp = {};
+    if (filters.dateFrom) filter.timestamp.$gte = new Date(filters.dateFrom);
+    if (filters.dateTo) {
+      const to = new Date(filters.dateTo);
+      to.setHours(23, 59, 59, 999);
+      filter.timestamp.$lte = to;
+    }
+  }
+
+  const decisions = await Decision.find(filter).sort({ timestamp: -1 }).limit(10000).lean();
+
+  const rows = decisions.map((d) => ({
+    "Transaction ID": d.transactionId,
+    Model: d.modelName,
+    Supplier: d.supplierName,
+    Amount: d.amount,
+    Country: d.country,
+    "Risk Level": d.riskLevel,
+    "Risk Score": d.riskScore,
+    Confidence: d.confidence,
+    Outcome: d.outcome,
+    Feedback: d.feedback?.rating ?? "",
+    Timestamp: new Date(d.timestamp).toISOString(),
+    Explanation: d.explanation ?? "",
+  }));
+
+  if (format === "json") {
+    return { data: JSON.stringify(rows, null, 2), format: "json" };
+  }
+
+  return { data: Papa.unparse(rows), format: "csv" };
+}
 
 export interface CreateDecisionState {
   success: boolean;

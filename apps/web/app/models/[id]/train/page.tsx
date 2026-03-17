@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Badge } from "@merlynn/ui";
 import { ScenarioCard, type Scenario } from "@/components/models/ScenarioCard";
 import { TrainingProgress } from "@/components/models/TrainingProgress";
+import { getModel, updateModel } from "@/app/actions/models";
 
 /* -------------------------------------------------------------------------- */
 /*  Scenario generation                                                       */
@@ -87,7 +87,6 @@ function generateScenarios(count: number): Scenario[] {
     const country = COUNTRIES[Math.floor(rand() * COUNTRIES.length)] ?? "United States";
     const isHighRiskCountry = HIGH_RISK_COUNTRIES.has(country);
 
-    // Amount tier
     const tier = rand();
     let amount: number;
     if (tier < 0.4) {
@@ -100,14 +99,12 @@ function generateScenarios(count: number): Scenario[] {
 
     const isLargeAmount = amount > 500000;
 
-    // Number of risk factors: influenced by country and amount
     let baseFactors = Math.floor(rand() * 2);
     if (isHighRiskCountry) baseFactors += 1;
     if (isLargeAmount) baseFactors += 1;
     if (rand() > 0.7) baseFactors += 1;
     const numFactors = Math.min(baseFactors, 4);
 
-    // Pick random risk factors
     const shuffled = [...RISK_FACTORS].sort(() => rand() - 0.5);
     const riskFactors = shuffled.slice(0, numFactors);
 
@@ -157,18 +154,25 @@ export default function TrainModelPage(): React.JSX.Element {
   const params = useParams();
   const id = params.id as string;
 
-  const {
-    data: model,
-    isLoading,
-    error,
-  } = useQuery<ModelData>({
-    queryKey: ["model", id],
-    queryFn: async () => {
-      const res = await fetch(`/api/models/${id}`);
-      if (!res.ok) throw new Error("Failed to fetch model");
-      return res.json() as Promise<ModelData>;
-    },
-  });
+  const [model, setModel] = useState<ModelData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  // Fetch model via server action
+  useEffect(() => {
+    startTransition(async () => {
+      try {
+        const data = await getModel(id);
+        if (data) {
+          setModel({ _id: data._id, name: data.name, status: data.status });
+        } else {
+          setError("Model not found");
+        }
+      } catch (e) {
+        setError((e as Error).message);
+      }
+    });
+  }, [id]);
 
   const scenarios = useMemo(() => generateScenarios(TOTAL_SCENARIOS), []);
 
@@ -191,12 +195,8 @@ export default function TrainModelPage(): React.JSX.Element {
   const handleComplete = useCallback(async () => {
     setIsCompleting(true);
     try {
-      const res = await fetch(`/api/models/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "training" }),
-      });
-      if (!res.ok) throw new Error("Failed to update model");
+      const result = await updateModel(id, { status: "training" });
+      if (!result.success) throw new Error(result.error);
       setIsCompleted(true);
     } catch {
       // Could show error toast
@@ -206,7 +206,7 @@ export default function TrainModelPage(): React.JSX.Element {
   }, [id]);
 
   /* Loading state */
-  if (isLoading) {
+  if (isPending && !model) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-700 border-t-blue-500" />
@@ -219,7 +219,7 @@ export default function TrainModelPage(): React.JSX.Element {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-sm text-red-400">
-          {error ? `Error: ${(error as Error).message}` : "Model not found"}
+          {error ?? "Model not found"}
         </div>
       </div>
     );

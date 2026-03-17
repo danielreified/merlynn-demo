@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Node, Edge } from "@xyflow/react";
 import { ModelCanvas } from "@/components/models/ModelCanvas";
+import { createModel } from "@/app/actions/models";
 
 const defaultNodes: Node[] = [
   {
@@ -72,18 +73,14 @@ export default function NewModelPage(): React.JSX.Element {
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
-      const res = await fetch("/api/models", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          nodes: nodesRef.current,
-          edges: edgesRef.current,
-        }),
+      const result = await createModel({
+        name,
+        nodes: nodesRef.current,
+        edges: edgesRef.current,
       });
-      if (!res.ok) throw new Error("Failed to save model");
-      const model = (await res.json()) as { _id: string };
-      router.push(`/models/${model._id}/edit`);
+      if (result.success && result.model) {
+        router.push(`/models/${result.model._id}/edit`);
+      }
     } catch {
       // Could show a toast here
     } finally {

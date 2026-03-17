@@ -1,15 +1,16 @@
 "use client";
 
-import React, { Suspense } from "react";
+import React, { Suspense, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@merlynn/ui";
+import { listModels } from "@/app/actions/models";
 
 interface ModelSummary {
   _id: string;
   name: string;
   status: string;
   nodeCount: number;
+  nodes?: unknown[];
   updatedAt: string;
 }
 
@@ -25,14 +26,30 @@ function statusBadgeVariant(status: string): "high" | "medium" | "low" {
 }
 
 function ModelsPageInner(): React.JSX.Element {
-  const { data, isLoading, error } = useQuery<ModelSummary[]>({
-    queryKey: ["models"],
-    queryFn: async () => {
-      const res = await fetch("/api/models");
-      if (!res.ok) throw new Error("Failed to fetch models");
-      return res.json() as Promise<ModelSummary[]>;
-    },
-  });
+  const [data, setData] = useState<ModelSummary[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    startTransition(async () => {
+      try {
+        const models = await listModels();
+        setData(
+          models.map((m) => ({
+            _id: m._id,
+            name: m.name,
+            status: m.status,
+            nodeCount: Array.isArray(m.nodes) ? m.nodes.length : 0,
+            updatedAt: m.updatedAt,
+          }))
+        );
+      } catch (e) {
+        setError((e as Error).message);
+      }
+    });
+  }, []);
+
+  const isLoading = isPending && !data;
 
   return (
     <div className="flex h-full flex-col overflow-hidden p-4 lg:p-6">
@@ -46,21 +63,18 @@ function ModelsPageInner(): React.JSX.Element {
         </Link>
       </div>
 
-      {/* Loading state */}
       {isLoading && (
         <div className="flex flex-1 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-700 border-t-blue-500" />
         </div>
       )}
 
-      {/* Error state */}
       {error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400">
-          Error loading models: {(error as Error).message}
+          Error loading models: {error}
         </div>
       )}
 
-      {/* Grid of model cards */}
       {data && data.length > 0 && (
         <div className="grid flex-1 auto-rows-min grid-cols-1 gap-4 overflow-auto md:grid-cols-2 lg:grid-cols-3">
           {data.map((model) => (
@@ -99,7 +113,6 @@ function ModelsPageInner(): React.JSX.Element {
         </div>
       )}
 
-      {/* Empty state */}
       {data && data.length === 0 && (
         <div className="flex flex-1 flex-col items-center justify-center text-slate-400">
           <svg

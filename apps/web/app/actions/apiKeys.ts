@@ -16,14 +16,29 @@ interface CreateKeyResult {
 }
 
 export async function createApiKey(name: string): Promise<CreateKeyResult> {
-  const session = await auth();
+  let session;
+  try {
+    console.log("[createApiKey] calling auth()...");
+    session = await auth();
+    console.log("[createApiKey] auth() returned, user:", session?.user?.id ?? "null");
+  } catch (e) {
+    console.error("createApiKey auth() error:", e);
+    return { success: false, error: "Authentication check failed" };
+  }
   if (!session?.user?.id) return { success: false, error: "Not authenticated" };
 
   if (!name || name.trim().length === 0) {
     return { success: false, error: "Name is required" };
   }
 
-  await connectDB();
+  try {
+    console.log("[createApiKey] connecting to DB...");
+    await connectDB();
+    console.log("[createApiKey] DB connected");
+  } catch (e) {
+    console.error("createApiKey connectDB() error:", e);
+    return { success: false, error: "Database connection failed" };
+  }
 
   // Generate a key: mk_live_ + 32 random hex chars
   const rawKey = `mk_live_${randomBytes(24).toString("hex")}`;
