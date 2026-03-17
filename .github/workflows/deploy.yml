@@ -69,12 +69,13 @@ jobs:
         env:
           ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-          IMAGE_TAG: ${{ github.sha }}
+          SHORT_SHA: ${{ github.sha }}
         run: |
-          IMAGE_URI=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker build -t $IMAGE_URI -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          DEV_TAG=dev-${SHORT_SHA:0:7}
+          IMAGE_URI=$ECR_REGISTRY/$ECR_REPOSITORY:$DEV_TAG
+          docker build -t $IMAGE_URI -t $ECR_REGISTRY/$ECR_REPOSITORY:dev-latest .
           docker push $IMAGE_URI
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:dev-latest
           echo "uri=$IMAGE_URI" >> $GITHUB_OUTPUT
 
   # ─── Deploy ───────────────────────────────────────────────
