@@ -17,7 +17,7 @@ jobs:
     name: Lint & Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: rharkor/caching-for-turbo@v1.8
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
@@ -27,7 +27,7 @@ jobs:
     name: Typecheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: rharkor/caching-for-turbo@v1.8
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
@@ -37,7 +37,7 @@ jobs:
     name: Test — DB
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun test --cwd packages/db
@@ -51,7 +51,7 @@ jobs:
     outputs:
       image: ${{ steps.image.outputs.uri }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -117,7 +117,7 @@ jobs:
     needs: [lint, typecheck, test-db]
     environment: dev
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
 
@@ -145,7 +145,7 @@ jobs:
     needs: [lint, typecheck, test-db]
     environment: dev
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
 
