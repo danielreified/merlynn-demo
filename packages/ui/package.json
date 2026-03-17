@@ -10,8 +10,9 @@
     "typecheck": "tsc --noEmit",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "echo 'storybook browser tests — run test:storybook locally'",
+    "test:storybook": "vitest run",
+    "test:storybook:watch": "vitest",
     "test:visual": "vitest run --config vitest.visual.config.ts",
     "test:visual:update": "vitest run --config vitest.visual.config.ts --update"
   },
