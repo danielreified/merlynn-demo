@@ -9,7 +9,7 @@ COPY packages/ui/package.json ./packages/ui/
 COPY packages/email/package.json ./packages/email/
 COPY turbo.json tsconfig.base.json ./
 
-RUN CYPRESS_INSTALL_BINARY=0 bun install --frozen-lockfile
+RUN bun install --frozen-lockfile
 
 # ---- Stage 2: Build the application ----
 FROM oven/bun:1-slim AS builder

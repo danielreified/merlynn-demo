@@ -6,8 +6,47 @@ A financial risk decision monitoring dashboard built to demonstrate proficiency 
 
 ---
 
+## Prerequisites
+
+| Dependency  | Version | Install                               |
+| ----------- | ------- | ------------------------------------- |
+| **Node.js** | >= 22   | [nodejs.org](https://nodejs.org/)     |
+| **Bun**     | >= 1.3  | [bun.sh](https://bun.sh/)             |
+| **Docker**  | Latest  | [docker.com](https://www.docker.com/) |
+
+> Node.js and Bun are required for local development. Docker is required for MongoDB and running the test suites (e2e, visual regression).
+
+---
+
+## Live URLs
+
+### Deployed (Dev Stack — AWS `af-south-1`)
+
+| Service       | URL                                                                  |
+| ------------- | -------------------------------------------------------------------- |
+| Web App       | [app.daniellourie.me](https://app.daniellourie.me)                   |
+| API Docs      | [app.daniellourie.me/api/docs](https://app.daniellourie.me/api/docs) |
+| Storybook     | [storybook.daniellourie.me](https://storybook.daniellourie.me)       |
+| Email Preview | [emails.daniellourie.me](https://emails.daniellourie.me)             |
+
+### Local Development
+
+| Service       | URL                                    | Command                            |
+| ------------- | -------------------------------------- | ---------------------------------- |
+| Web App       | http://localhost:3000                  | `bun run dev`                      |
+| API Docs      | http://localhost:3000/api/docs         | (served by web app)                |
+| OpenAPI Spec  | http://localhost:3000/api/openapi.json | (served by web app)                |
+| Storybook     | http://localhost:6006                  | `bun run storybook`                |
+| Email Preview | http://localhost:3333                  | `cd packages/email && bun run dev` |
+| MongoDB       | mongodb://localhost:27017              | `bun run docker:up`                |
+| Mongo Express | http://localhost:8081                  | (included with docker:up)          |
+
+---
+
 ## Table of Contents
 
+- [Prerequisites](#prerequisites)
+- [Live URLs](#live-urls)
 - [Tech Stack](#tech-stack)
 - [Monorepo Structure](#monorepo-structure)
 - [Features](#features)
@@ -19,7 +58,7 @@ A financial risk decision monitoring dashboard built to demonstrate proficiency 
 - [Database Models](#database-models)
 - [Testing](#testing)
 - [Deployment](#deployment)
-- [CI/CD](#cicd)
+- [Pipeline](#pipeline)
 - [Architecture Decisions](#architecture-decisions)
 - [Stack Alignment](#stack-alignment)
 
@@ -44,7 +83,7 @@ A financial risk decision monitoring dashboard built to demonstrate proficiency 
 | **@xyflow/react**                | Interactive node/edge graph visualization for model editor             |
 | **PapaParse**                    | Client-side CSV export generation                                      |
 | **Jest + MongoDB Memory Server** | Isolated database testing without external dependencies                |
-| **Cypress 13**                   | End-to-end testing of critical user flows                              |
+| **Playwright 1.58**              | End-to-end testing of critical user flows (Dockerized)                 |
 | **Vitest + Playwright**          | Visual regression testing for UI components                            |
 | **Storybook 10**                 | Component development and visual documentation                         |
 | **Scalar**                       | Auto-generated interactive OpenAPI documentation                       |
@@ -77,7 +116,7 @@ merlynn-demo/
 │       │   ├── risk.ts               # Risk assessment simulation engine
 │       │   ├── seed.ts               # 25 sample financial transactions
 │       │   └── api/                  # Hono routers & auth middleware
-│       └── cypress/                  # E2E test specs & fixtures
+│       └── e2e/                      # Playwright E2E tests & global setup
 ├── packages/
 │   ├── db/                           # @merlynn/db — Mongoose models
 │   │   ├── src/
@@ -166,17 +205,11 @@ Client-rendered with React Query for real-time filtering and caching:
 
 ## Getting Started
 
-### Prerequisites
-
-- [Bun](https://bun.sh/) >= 1.3
-- [MongoDB](https://www.mongodb.com/) running locally (or a connection string to Atlas)
-- [Docker](https://www.docker.com/) (optional, for containerized development)
-
 ### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/merlynn-demo.git
+git clone https://github.com/daniellourie/merlynn-demo.git
 cd merlynn-demo
 
 # Install dependencies
@@ -186,15 +219,14 @@ bun install
 ### Local Development
 
 ```bash
-# Option 1: Start with local MongoDB
-bun run dev
-
-# Option 2: Start with Docker (includes MongoDB)
+# Start MongoDB via Docker
 bun run docker:up
+
+# Start the dev server
 bun run dev
 ```
 
-The app will be available at `http://localhost:3000`. On first load, 25 realistic financial transactions are auto-seeded into the database.
+The app will be available at `http://localhost:3000`. On first login, 25 realistic financial transactions and a default admin user are auto-seeded into the database.
 
 ---
 
@@ -231,20 +263,19 @@ In production (ECS), `MONGODB_URI` and `AUTH_SECRET` are injected from AWS Secre
 | `bun run test`         | Run all test suites                          |
 | `bun run storybook`    | Start Storybook dev server                   |
 | `bun run test:visual`  | Run visual regression tests (Docker)         |
-| `bun run test:e2e`     | Run Cypress tests headless                   |
+| `bun run test:e2e`     | Run Playwright E2E tests (Docker)            |
 | `bun run docker:up`    | Start docker-compose services                |
 | `bun run docker:down`  | Stop docker-compose services                 |
 | `bun run docker:build` | Build and start all Docker services          |
 
 ### apps/web
 
-| Command                    | Description                    |
-| -------------------------- | ------------------------------ |
-| `bun run dev`              | Next.js dev server (port 3000) |
-| `bun run build`            | Production build               |
-| `bun run start`            | Start production server        |
-| `bun run cypress`          | Open Cypress UI                |
-| `bun run cypress:headless` | Run Cypress headless           |
+| Command            | Description                    |
+| ------------------ | ------------------------------ |
+| `bun run dev`      | Next.js dev server (port 3000) |
+| `bun run build`    | Production build               |
+| `bun run start`    | Start production server        |
+| `bun run test:e2e` | Run Playwright E2E tests       |
 
 ### packages/ui
 
@@ -399,6 +430,8 @@ The application uses MongoDB with Mongoose. Four collections:
 
 ## Testing
 
+All tests run inside Docker containers for environment consistency — no need to install browsers or databases locally. Docker Compose profiles isolate each test suite so they don't interfere with each other.
+
 ### Unit Tests
 
 ```bash
@@ -410,26 +443,80 @@ Jest tests in `packages/db/__tests__/` use [MongoDB Memory Server](https://githu
 ### End-to-End Tests
 
 ```bash
-# Interactive
-bun run cypress
+# Run all e2e tests (Docker)
+docker compose --profile e2e run --rm e2e
 
-# Headless (CI)
-bun run test:e2e
+# Rebuild and run (after code changes)
+docker compose --profile e2e run --rm --build e2e
+
+# Stop containers when done
+docker compose --profile e2e down
 ```
 
-Cypress specs in `apps/web/cypress/` test critical user flows.
+Playwright specs in `apps/web/e2e/` test critical user flows against the full application stack.
+
+**How it works:**
+
+```
+docker compose --profile e2e
+├── mongo        MongoDB 7 (fresh database)
+├── web          Next.js app (production build)
+└── e2e          Playwright test runner
+                 ├── globalSetup    1. Seeds MongoDB with test decisions
+                 │                  2. Logs in via the UI
+                 │                  3. Saves auth cookies to storageState
+                 └── test specs     Run authenticated against the live app
+```
+
+1. **Database seeding** — A Playwright `globalSetup` script connects directly to MongoDB and inserts a fixed set of test decisions (prefixed `E2E-TXN-*`). This ensures deterministic data regardless of environment state.
+2. **Authentication** — The same global setup logs in with the seeded demo credentials (`admin@merlynn.co.za` / `demo1234`) and saves the session cookie to `e2e/.auth/storage-state.json`. All tests reuse this auth state — no login step needed per test.
+3. **Results** — Test reports and failure screenshots are mounted back to the host:
+   - `apps/web/playwright-report/` — HTML report (open `index.html` in a browser)
+   - `apps/web/test-results/` — Failure screenshots and traces
+
+**Test coverage:**
+
+| Test            | What it verifies                                                        |
+| --------------- | ----------------------------------------------------------------------- |
+| Stat cards      | Dashboard renders KPI cards (Total Today, High Risk Flagged, etc.)      |
+| Decisions table | Recent Decisions table is visible and populated                         |
+| Decision detail | Clicking a row navigates to detail page with Risk Score and SHAP values |
+| Navigation      | "Back to Decisions" link returns to the decisions list                  |
 
 ### Visual Regression Tests
 
 ```bash
-# Run tests (requires Docker)
-bun run test:visual
+# Run visual tests (Docker)
+docker compose --profile visual run --rm visual-test
 
-# Update snapshots
-bun run test:visual:update
+# Update snapshots after intentional UI changes
+docker compose --profile visual run --rm visual-test bun run test:visual:update
+
+# Stop containers when done
+docker compose --profile visual down
 ```
 
-Vitest + Playwright-based visual regression testing for Storybook components. Screenshots stored in `packages/ui/stories/__screenshots__/`.
+Vitest + Playwright-based visual regression testing for Storybook components.
+
+**How it works:**
+
+```
+docker compose --profile visual
+├── storybook      Storybook dev server (port 6006, with healthcheck)
+└── visual-test    Vitest Browser Mode + Playwright
+                   ├── Opens each story in a headless browser
+                   ├── Takes a base64 screenshot
+                   └── Compares against stored snapshots (.snap file)
+```
+
+1. **Storybook** runs as a separate container. The `visual-test` container waits for its healthcheck to pass before starting.
+2. **Screenshots** are taken via a custom Vitest browser command that opens a new Playwright page for each story, waits for rendering + play functions to settle, and captures a base64 PNG.
+3. **Snapshots** are stored in `packages/ui/stories/__screenshots__/__snapshots__/` and mounted back to the host so updates persist.
+4. On subsequent runs, Vitest diffs the new screenshot against the stored snapshot. Any pixel difference causes the test to fail — run with `test:visual:update` to accept the new baseline.
+
+**Components tested:**
+
+Badge (High/Medium/Low), Button (Default/Destructive/Outline/Disabled), Card (Stat/HighRisk), Dialog, Select
 
 ### Pre-commit Hooks
 
@@ -509,31 +596,203 @@ docker run -p 3000:3000 --env-file apps/web/.env.local merlynn-demo
 
 ---
 
-## CI/CD
+## Pipeline
 
-### Pull Request (`ci.yml`)
+The full pipeline from local development to production, covering every gate and automation step.
 
-Runs on every pull request:
+### Overview
 
-1. Lint + Prettier format check
-2. TypeScript typecheck
-3. Jest tests (with MongoDB Memory Server)
-4. Security audit (`npm audit`)
-5. Full build (requires all above to pass)
+```
+Local Dev ──▶ Pre-commit Hooks ──▶ Push ──▶ CI / Deploy ──▶ Production
+    │              │                          │                  │
+    │         Lint-staged              PR → ci.yml          release.yml
+    │         CommitLint          develop → deploy.yml     (Release Please)
+    │                                   │
+    │                          ┌────────┼────────┐
+    │                          ▼        ▼        ▼
+    │                        ECS    Storybook  Emails
+    │                       (app)    (S3+CF)  (S3+CF)
+    ▼
+ localhost:3000
+```
 
-### Deploy to Dev (`deploy.yml`)
+### Stage 1: Local Development
 
-Triggered on push to `develop`:
+When you run `bun run dev`, Turborepo starts all workspace dev servers in parallel. The Next.js app at `:3000` consumes `@merlynn/db` and `@merlynn/ui` as workspace dependencies — changes to those packages are picked up immediately via TypeScript path resolution (no build step needed in dev).
 
-1. All CI checks
-2. Docker build → push to ECR (tagged `dev-{sha}` and `dev-latest`)
-3. ECS force-new-deployment → wait for stable
-4. Storybook build → deploy to S3 → CloudFront invalidation
-5. Email previews → deploy to S3 → CloudFront invalidation
+Docker Compose provides local services:
 
-### Production Release (`release.yml`)
+```bash
+bun run docker:up   # Starts MongoDB (:27017) + Mongo Express (:8081)
+bun run dev         # Starts Next.js (:3000)
+```
 
-Triggered manually or on version tag for production deployment.
+On first load, `ensureSeeded()` checks if the database is empty and inserts 25 sample transactions + a default admin user.
+
+### Stage 2: Pre-commit Hooks
+
+Every `git commit` triggers two Husky hooks before the commit is created:
+
+**1. `pre-commit` → lint-staged**
+
+Runs only on staged files (not the whole codebase):
+
+| File pattern           | Actions                             |
+| ---------------------- | ----------------------------------- |
+| `*.{ts,tsx}`           | `eslint --fix` → `prettier --write` |
+| `*.{json,md,yml,yaml}` | `prettier --write`                  |
+
+If ESLint finds unfixable errors, the commit is blocked.
+
+**2. `commit-msg` → commitlint**
+
+Validates the commit message against [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+type(scope): description
+
+# Valid types: feat, fix, docs, style, refactor, test, chore, ci, perf, build
+# Examples:
+#   feat: add CSV export to decisions page
+#   fix(api): handle invalid ObjectId in decisions endpoint
+#   docs: update README with pipeline details
+```
+
+If the message doesn't match the format, the commit is rejected.
+
+### Stage 3: Pull Request CI (`ci.yml`)
+
+Triggered on pull requests to `develop` or `main`. Runs 5 parallel jobs with a dependency gate:
+
+```
+┌──────────┐  ┌────────────┐  ┌───────────┐  ┌──────────────────┐
+│   Lint   │  │ Typecheck  │  │ Test — DB │  │ Security Audit   │
+│ & Format │  │            │  │           │  │ (npm audit, soft) │
+└────┬─────┘  └─────┬──────┘  └─────┬─────┘  └──────────────────┘
+     │              │               │
+     │    must all pass             │
+     └──────────┬───┘───────────────┘
+                ▼
+          ┌───────────┐
+          │   Build   │
+          │ (full app)│
+          └───────────┘
+```
+
+| Job               | What it does                                                                            |
+| ----------------- | --------------------------------------------------------------------------------------- |
+| **Lint & Format** | `bun run lint` + `bun run format:check` (Prettier in check mode)                        |
+| **Typecheck**     | `bun run typecheck` (TypeScript `--noEmit` across all packages)                         |
+| **Test — DB**     | `bun test --cwd packages/db` (Jest + MongoDB Memory Server)                             |
+| **Security**      | `npm audit --audit-level=high` (advisory, doesn't block)                                |
+| **Build**         | `bun run build` — full Next.js production build (only if lint + typecheck + tests pass) |
+
+All jobs use Turborepo remote caching (`rharkor/caching-for-turbo`) so unchanged packages skip re-running.
+
+### Stage 4: Deploy to Dev (`deploy.yml`)
+
+Triggered on every push to `develop` (i.e., when a PR is merged). Runs CI checks again, then deploys three things in parallel:
+
+#### 4a. Web App → ECS Fargate
+
+```
+CI passes ──▶ Docker build ──▶ Push to ECR ──▶ ECS force-new-deployment ──▶ Wait for stable
+                  │
+                  ├── tag: dev-{short-sha}
+                  └── tag: dev-latest
+```
+
+1. **Docker build** — Multi-stage `Dockerfile` produces a Node 22 Alpine image
+2. **Push to ECR** — Tagged with `dev-{7-char-sha}` and `dev-latest`
+3. **ECS update** — `aws ecs update-service --force-new-deployment` pulls the new image
+4. **Wait** — `aws ecs wait services-stable` blocks until the new task is healthy (health check at `/api/health`)
+5. **Live at** → `https://app.daniellourie.me`
+
+#### 4b. Storybook → S3 + CloudFront
+
+```
+CI passes ──▶ Build Storybook ──▶ Sync to S3 ──▶ CloudFront invalidation
+```
+
+1. `cd packages/ui && bun run build-storybook` → static HTML/JS
+2. `aws s3 sync` to the Storybook bucket (with `--delete` to remove stale files)
+3. `aws cloudfront create-invalidation --paths "/*"` to bust the CDN cache
+4. **Live at** → `https://storybook.daniellourie.me`
+
+#### 4c. Email Previews → S3 + CloudFront
+
+```
+CI passes ──▶ Build emails ──▶ Export HTML ──▶ Sync to S3 ──▶ CloudFront invalidation
+```
+
+1. `bun run build` compiles TypeScript
+2. `bunx react-email export` renders templates to static HTML
+3. Same S3 sync + CloudFront invalidation pattern
+4. **Live at** → `https://emails.daniellourie.me`
+
+### Stage 5: Production Release (`release.yml`)
+
+Triggered on push to `main`. Uses [Release Please](https://github.com/googleapis/release-please) for automated semantic versioning:
+
+```
+Push to main ──▶ Release Please ──▶ Creates/updates release PR
+                                          │
+                                    (when PR merges)
+                                          │
+                                          ▼
+                                   Publish release image
+                                          │
+                                    ├── tag: v{version}
+                                    └── tag: latest
+```
+
+1. **Release Please** analyzes conventional commit messages since the last release
+2. Creates a release PR with a changelog and version bump
+3. When that PR merges, the `publish` job runs:
+   - Builds the Docker image
+   - Tags with the version (`v1.2.3`) and `latest`
+   - Pushes both tags to ECR (production environment)
+
+### Stage 6: Production Deployment (Planned)
+
+Once the Release Please PR merges and the versioned image (`v1.2.3`) is pushed to ECR, the production deployment would follow the same build pipeline as dev but with a blue/green release strategy to eliminate downtime and allow safe rollbacks.
+
+#### Blue/Green via ECS + CodeDeploy
+
+Rather than the `force-new-deployment` used in dev, production would use AWS CodeDeploy with ECS blue/green deployments:
+
+1. **Green task set launches** — ECS spins up a new set of Fargate tasks running the release image alongside the existing ("blue") tasks
+2. **Test traffic** — The ALB routes test listener traffic to the green target group. Health checks on `/api/health` must pass before any production traffic is shifted
+3. **Canary traffic shift** — Production traffic shifts gradually using a `CodeDeployDefault.ECSCanary10Percent5Minutes` configuration: 10% of traffic moves to green, holds for 5 minutes, then shifts the remaining 90%
+4. **Blue tear-down** — Once green is fully live and stable, the original blue tasks are terminated
+
+#### Monitoring & Auto-Rollback
+
+During the 5-minute canary window, CloudWatch alarms would monitor:
+
+- **5xx error rate** on the ALB target group
+- **p99 response latency** exceeding baseline thresholds
+- **ECS task health** — unhealthy task count > 0
+
+If any alarm enters `ALARM` state during the shift, CodeDeploy automatically rolls back to blue — re-routing all traffic to the original task set with zero manual intervention. A rollback can also be triggered manually via `aws deploy stop-deployment`.
+
+#### Static Assets
+
+Storybook and email previews would follow the same S3 sync + CloudFront invalidation pattern as dev, targeting the production buckets (`prod-afs1-merlynn-storybook`, `prod-afs1-merlynn-emails`) and distributions. Since these are static files with no running processes, a simple `--delete` sync is sufficient — no blue/green needed.
+
+#### Terraform Changes
+
+The production ECS service would add an `aws_codedeploy_app` and `aws_codedeploy_deployment_group` resource with blue/green configuration, replacing the simple rolling update used in dev. The ALB would gain a second (test) listener on port 8443 for pre-shift validation.
+
+### Pipeline Summary
+
+| Trigger                   | Workflow      | What happens                                                          |
+| ------------------------- | ------------- | --------------------------------------------------------------------- |
+| `git commit`              | Husky hooks   | lint-staged (ESLint + Prettier) + commitlint                          |
+| PR to `develop` or `main` | `ci.yml`      | Lint, typecheck, test, security audit, build                          |
+| Push to `develop`         | `deploy.yml`  | CI + deploy app (ECS), Storybook (S3), emails (S3)                    |
+| Push to `main`            | `release.yml` | Release Please → version tag → production Docker image to ECR         |
+| Release image published   | (planned)     | CodeDeploy blue/green → canary traffic shift → auto-rollback on alarm |
 
 ---
 
@@ -556,18 +815,18 @@ Triggered manually or on version tag for production deployment.
 
 Mapping each technology to the Merlynn Intelligence Technologies JD requirements:
 
-| JD Requirement      | Implementation                                                      |
-| ------------------- | ------------------------------------------------------------------- |
-| React / Next.js     | Next.js 15 with App Router, Server + Client Components              |
-| TypeScript          | Strict mode across all packages, no `any` types                     |
-| MongoDB             | Mongoose ODM with connection pooling, indexed queries               |
-| Component Libraries | Radix UI primitives with custom Tailwind styling                    |
-| State Management    | TanStack React Query for server state, React hooks for local state  |
-| Testing             | Jest + MongoDB Memory Server (unit), Cypress (e2e), Vitest (visual) |
-| Monorepo            | Turborepo with Bun workspaces                                       |
-| CI/CD               | GitHub Actions: lint, typecheck, test, build, deploy                |
-| Data Visualization  | SHAP value bar charts, risk score indicators, confidence gauges     |
-| Infrastructure      | Terraform (AWS), Docker multi-stage builds, ECS Fargate             |
+| JD Requirement      | Implementation                                                         |
+| ------------------- | ---------------------------------------------------------------------- |
+| React / Next.js     | Next.js 15 with App Router, Server + Client Components                 |
+| TypeScript          | Strict mode across all packages, no `any` types                        |
+| MongoDB             | Mongoose ODM with connection pooling, indexed queries                  |
+| Component Libraries | Radix UI primitives with custom Tailwind styling                       |
+| State Management    | TanStack React Query for server state, React hooks for local state     |
+| Testing             | Jest + MongoDB Memory Server (unit), Playwright (e2e), Vitest (visual) |
+| Monorepo            | Turborepo with Bun workspaces                                          |
+| CI/CD               | GitHub Actions: lint, typecheck, test, build, deploy                   |
+| Data Visualization  | SHAP value bar charts, risk score indicators, confidence gauges        |
+| Infrastructure      | Terraform (AWS), Docker multi-stage builds, ECS Fargate                |
 
 ---
 

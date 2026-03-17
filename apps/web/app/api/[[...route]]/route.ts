@@ -63,7 +63,7 @@ app.doc("/openapi.json", {
     version: "1.0.0",
     contact: { name: "Merlynn", url: "https://merlynn.co.za" },
   },
-  servers: [{ url: "/api", description: "Current environment" }],
+  servers: [{ url: "/", description: "Current environment" }],
   security: [{ BearerAuth: [] }],
 });
 

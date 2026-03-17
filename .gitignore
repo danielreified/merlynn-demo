@@ -3,12 +3,13 @@ node_modules/
 .next/
 dist/
 .turbo/
+e2e/.auth/
 *.tsbuildinfo
 .env
 .env.local
 storybook-static/
-cypress/videos/
-cypress/screenshots/
+playwright-report/
+test-results/
 bun.lockb
 __snapshots__/__diff_output__/
 

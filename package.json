@@ -18,7 +18,7 @@
     "storybook": "turbo storybook",
     "test:visual": "docker compose --profile visual run --rm visual-test",
     "test:visual:update": "docker compose --profile visual run --rm visual-test bun run test:visual:update",
-    "test:e2e": "cd apps/web && bun run cypress:headless",
+    "test:e2e": "docker compose --profile e2e run --rm e2e",
     "test:storybook": "cd packages/ui && vitest run",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",

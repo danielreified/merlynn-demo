@@ -11,7 +11,7 @@ COPY apps/web/package.json ./apps/web/
 COPY packages/db/package.json ./packages/db/
 COPY packages/ui/package.json ./packages/ui/
 
-RUN CYPRESS_INSTALL_BINARY=0 bun install
+RUN bun install
 
 # Copy source code
 COPY packages/ui ./packages/ui

@@ -5,5 +5,10 @@ dist
 .git
 .env
 .env.local
-cypress
 storybook-static
+playwright-report
+test-results
+terraform/.terraform
+terraform/**/.terraform
+terraform/**/*.tfstate*
+terraform/**/plan.out

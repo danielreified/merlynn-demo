@@ -244,7 +244,7 @@ module "cloudfront_storybook" {
   aliases                        = ["prod-storybook.${local.root_domain}"]
   acm_certificate_arn            = module.acm_certs.cloudfront_cert_arn
   default_root_object            = "index.html"
-  enable_spa_fallback            = false
+  enable_spa_fallback            = true
   viewer_request_function_arn    = aws_cloudfront_function.spa_rewrite.arn
 }
 
@@ -264,7 +264,7 @@ module "cloudfront_emails" {
   aliases                        = ["prod-emails.${local.root_domain}"]
   acm_certificate_arn            = module.acm_certs.cloudfront_cert_arn
   default_root_object            = "index.html"
-  enable_spa_fallback            = false
+  enable_spa_fallback            = true
   viewer_request_function_arn    = aws_cloudfront_function.spa_rewrite.arn
 }
 

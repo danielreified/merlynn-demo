@@ -5,8 +5,22 @@ services:
       - "3000:3000"
     environment:
       MONGODB_URI: mongodb://mongo:27017/merlynn
+      AUTH_SECRET: e2e-test-secret-key-not-for-production
+      AUTH_URL: http://localhost:3000
     depends_on:
       - mongo
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
 
   mongo:
     image: mongo:7
@@ -58,6 +72,23 @@ services:
     command: bun run test:visual
     profiles:
       - visual
+
+  e2e:
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    volumes:
+      - ./apps/web/playwright-report:/app/apps/web/playwright-report
+      - ./apps/web/test-results:/app/apps/web/test-results
+    environment:
+      BASE_URL: http://web:3000
+      MONGODB_URI: mongodb://mongo:27017/merlynn
+    depends_on:
+      web:
+        condition: service_healthy
+    command: bun run test:e2e
+    profiles:
+      - e2e
 
 volumes:
   mongo_data:
