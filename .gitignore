@@ -1,0 +1,21 @@
+.DS_Store
+node_modules/
+.next/
+dist/
+.turbo/
+*.tsbuildinfo
+.env
+.env.local
+storybook-static/
+cypress/videos/
+cypress/screenshots/
+bun.lockb
+__snapshots__/__diff_output__/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform.lock.hcl
+crash.log

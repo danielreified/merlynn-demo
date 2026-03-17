@@ -1,0 +1,63 @@
+services:
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/merlynn
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: merlynn
+
+  mongo-express:
+    image: mongo-express:1
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://mongo:27017
+      ME_CONFIG_BASICAUTH: "false"
+    depends_on:
+      - mongo
+
+  storybook:
+    build:
+      context: .
+      dockerfile: Dockerfile.visual
+    ports:
+      - "6006:6006"
+    command: bun run storybook -- --host 0.0.0.0 --ci
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6006"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+    profiles:
+      - visual
+
+  visual-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.visual
+    volumes:
+      # Mount snapshot files so updates persist back to host
+      - ./packages/ui/stories/__screenshots__:/app/packages/ui/stories/__screenshots__
+    environment:
+      STORYBOOK_URL: http://storybook:6006
+    depends_on:
+      storybook:
+        condition: service_healthy
+    command: bun run test:visual
+    profiles:
+      - visual
+
+volumes:
+  mongo_data:

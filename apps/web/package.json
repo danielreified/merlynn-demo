@@ -1,0 +1,46 @@
+{
+  "name": "@merlynn/web",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "echo 'no unit tests'",
+    "cypress": "cypress open",
+    "cypress:headless": "cypress run"
+  },
+  "dependencies": {
+    "@hono/swagger-ui": "^0.6.1",
+    "@hono/zod-validator": "^0.7.6",
+    "@merlynn/db": "*",
+    "@merlynn/ui": "*",
+    "@scalar/hono-api-reference": "^0.10.3",
+    "@tanstack/react-query": "^5.62.0",
+    "@xyflow/react": "^12.10.1",
+    "bcryptjs": "^2.4.3",
+    "hono": "^4.12.8",
+    "next": "^15.1.0",
+    "next-auth": "5.0.0-beta.25",
+    "papaparse": "^5.5.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.0.0",
+    "@types/papaparse": "^5.5.2",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.0",
+    "cypress": "^13.16.0",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "^15.1.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.7.0"
+  }
+}

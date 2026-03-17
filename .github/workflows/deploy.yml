@@ -1,0 +1,131 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: af-south-1
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+
+jobs:
+  ci:
+    name: CI Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun run typecheck
+      - run: bun run test
+      - run: bun run build
+
+  deploy-web:
+    name: Deploy Web App
+    runs-on: ubuntu-latest
+    needs: [ci]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
+
+      - name: Build and push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Deploy to ECS
+        env:
+          ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+          ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
+        run: |
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Wait for deployment
+        env:
+          ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+          ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
+        run: |
+          aws ecs wait services-stable \
+            --cluster $ECS_CLUSTER \
+            --services $ECS_SERVICE \
+            --region ${{ env.AWS_REGION }}
+
+  deploy-storybook:
+    name: Deploy Storybook
+    runs-on: ubuntu-latest
+    needs: [ci]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+
+      - name: Build Storybook
+        run: cd packages/ui && bun run build-storybook
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Sync to S3
+        run: aws s3 sync packages/ui/storybook-static s3://${{ secrets.STORYBOOK_BUCKET }} --delete
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.STORYBOOK_DISTRIBUTION_ID }} \
+            --paths "/*"
+
+  deploy-emails:
+    name: Deploy Email Previews
+    runs-on: ubuntu-latest
+    needs: [ci]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+
+      - name: Export email previews
+        run: cd packages/email && bun run build && bunx react-email export --outDir out
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Sync to S3
+        run: aws s3 sync packages/email/out s3://${{ secrets.EMAILS_BUCKET }} --delete
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.EMAILS_DISTRIBUTION_ID }} \
+            --paths "/*"

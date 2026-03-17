@@ -1,0 +1,19 @@
+FROM mcr.microsoft.com/playwright:v1.49.0-jammy
+
+# Install bun
+RUN npm install -g bun
+
+WORKDIR /app
+
+# Copy workspace package files for dependency install
+COPY package.json bun.lockb* ./
+COPY apps/web/package.json ./apps/web/
+COPY packages/db/package.json ./packages/db/
+COPY packages/ui/package.json ./packages/ui/
+
+RUN CYPRESS_INSTALL_BINARY=0 bun install
+
+# Copy source code
+COPY packages/ui ./packages/ui
+
+WORKDIR /app/packages/ui

@@ -1,0 +1,44 @@
+@import '@xyflow/react/dist/style.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #0a0f1e;
+  color: #e2e8f0;
+}
+
+/* Custom scrollbar for fintech aesthetic */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0f1e;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* React Flow dark theme overrides */
+.react-flow__background {
+  background-color: #0a0f1e !important;
+}
+.react-flow__minimap {
+  background-color: #111827 !important;
+}
+.react-flow__controls button {
+  background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+  border-color: #334155 !important;
+}
+.react-flow__controls button:hover {
+  background-color: #334155 !important;
+}
+.react-flow__attribution {
+  display: none !important;
+}

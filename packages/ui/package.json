@@ -1,0 +1,46 @@
+{
+  "name": "@merlynn/ui",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "sideEffects": false,
+  "scripts": {
+    "lint": "echo 'lint ok'",
+    "typecheck": "tsc --noEmit",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:visual": "vitest run --config vitest.visual.config.ts",
+    "test:visual:update": "vitest run --config vitest.visual.config.ts --update"
+  },
+  "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.0",
+    "@radix-ui/react-select": "^2.1.0",
+    "@radix-ui/react-slot": "^1.1.0",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^2.6.0"
+  },
+  "devDependencies": {
+    "@storybook/addon-a11y": "^10.2.19",
+    "@storybook/addon-vitest": "^10.2.19",
+    "@storybook/react-vite": "^10.2.19",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitest/browser": "^3.0.9",
+    "@vitest/coverage-v8": "^3.0.9",
+    "autoprefixer": "^10.4.0",
+    "playwright": "^1.49.0",
+    "postcss": "^8.4.0",
+    "storybook": "^10.2.19",
+    "tailwindcss": "^3.4.0",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.9",
+    "vitest-browser-react": "^2.1.0"
+  }
+}
