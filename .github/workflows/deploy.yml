@@ -14,22 +14,50 @@ env:
   TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
 
 jobs:
-  ci:
-    name: CI Checks
+  lint:
+    name: Lint & Format
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun run lint
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
       - run: bun run typecheck
-      - run: bun run test
-      - run: bun run build
+
+  test-db:
+    name: Test — DB
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun test --cwd packages/db
+
+  test-ui:
+    name: Test — UI (Storybook)
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.58.2-noble
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: cd packages/ui && bun run test
+        env:
+          HOME: /root
 
   deploy-web:
     name: Deploy Web App
     runs-on: ubuntu-latest
-    needs: [ci]
+    needs: [lint, typecheck, test-db, test-ui]
     permissions:
       id-token: write
       contents: read
@@ -79,7 +107,7 @@ jobs:
   deploy-storybook:
     name: Deploy Storybook
     runs-on: ubuntu-latest
-    needs: [ci]
+    needs: [lint, typecheck, test-db, test-ui]
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -106,7 +134,7 @@ jobs:
   deploy-emails:
     name: Deploy Email Previews
     runs-on: ubuntu-latest
-    needs: [ci]
+    needs: [lint, typecheck, test-db, test-ui]
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
