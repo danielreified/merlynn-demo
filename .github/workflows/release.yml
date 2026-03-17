@@ -28,6 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [release]
     if: ${{ needs.release.outputs.release_created }}
+    environment: production
     env:
       AWS_REGION: af-south-1
     steps:
