@@ -159,9 +159,10 @@ module "ecs_web" {
     cpu    = 256
     memory = 512
     environment = {
-      NODE_ENV     = "production"
-      PORT         = tostring(local.app_port)
-      NEXTAUTH_URL = "https://app.${local.root_domain}"
+      NODE_ENV        = "production"
+      PORT            = tostring(local.app_port)
+      NEXTAUTH_URL    = "https://app.${local.root_domain}"
+      AUTH_TRUST_HOST = "true"
     }
     secrets = [
       {
