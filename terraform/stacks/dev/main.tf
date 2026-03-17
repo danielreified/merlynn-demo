@@ -133,25 +133,11 @@ module "ecs_cluster" {
 }
 
 # ═══════════════════════════════════════════════════════════════
-# Secrets Manager — Single JSON secret for all app secrets
+# Secrets Manager — created manually, referenced by ARN only
 # ═══════════════════════════════════════════════════════════════
 
-resource "aws_secretsmanager_secret" "web" {
-  name        = "merlynn/${local.env}/web"
-  description = "Merlynn web app secrets (JSON) — ${local.env}"
-}
-
-resource "aws_secretsmanager_secret_version" "web" {
-  secret_id = aws_secretsmanager_secret.web.id
-
-  secret_string = jsonencode({
-    MONGODB_URI = "mongodb+srv://merlynn_user:CHANGE_ME@cluster.mongodb.net/merlynn-dev?retryWrites=true&w=majority"
-    AUTH_SECRET = "CHANGE_ME_GENERATE_WITH_OPENSSL_RAND"
-  })
-
-  lifecycle {
-    ignore_changes = [secret_string]
-  }
+data "aws_secretsmanager_secret" "web" {
+  name = "merlynn/${local.env}/web"
 }
 
 # ═══════════════════════════════════════════════════════════════
@@ -180,11 +166,11 @@ module "ecs_web" {
     secrets = [
       {
         name      = "MONGODB_URI"
-        valueFrom = "${aws_secretsmanager_secret.web.arn}:MONGODB_URI::"
+        valueFrom = "${data.aws_secretsmanager_secret.web.arn}:MONGODB_URI::"
       },
       {
         name      = "AUTH_SECRET"
-        valueFrom = "${aws_secretsmanager_secret.web.arn}:AUTH_SECRET::"
+        valueFrom = "${data.aws_secretsmanager_secret.web.arn}:AUTH_SECRET::"
       },
     ]
   }
@@ -203,7 +189,7 @@ data "aws_iam_policy_document" "ecs_task_policy" {
   statement {
     effect    = "Allow"
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = [aws_secretsmanager_secret.web.arn]
+    resources = [data.aws_secretsmanager_secret.web.arn]
   }
 }
 

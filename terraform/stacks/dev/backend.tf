@@ -6,4 +6,12 @@ terraform {
       version = "~> 6.0"
     }
   }
+
+  backend "s3" {
+    bucket         = "dev-afs1-merlynn-tfstate"
+    key            = "dev/terraform.tfstate"
+    region         = "af-south-1"
+    dynamodb_table = "dev-afs1-merlynn-tflock"
+    encrypt        = true
+  }
 }
