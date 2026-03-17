@@ -38,24 +38,6 @@ export interface IDecision {
 
 export interface IDecisionDocument extends IDecision, Document {}
 
-const ShapValueSchema = new Schema<ShapValue>(
-  {
-    factor: { type: String, required: true },
-    contribution: { type: Number, required: true },
-  },
-  { _id: false }
-);
-
-const FeedbackSchema = new Schema<Feedback>(
-  {
-    rating: { type: String, required: true, enum: ["CORRECT", "PARTIAL", "INCORRECT"] },
-    note: { type: String },
-    submittedBy: { type: String, required: true },
-    submittedAt: { type: Date, required: true, default: Date.now },
-  },
-  { _id: false }
-);
-
 const DecisionSchema = new Schema<IDecisionDocument>(
   {
     transactionId: {
@@ -112,7 +94,7 @@ const DecisionSchema = new Schema<IDecisionDocument>(
       required: true,
     },
     shapValues: {
-      type: [ShapValueSchema],
+      type: [Schema.Types.Mixed] as unknown as ShapValue[],
       required: true,
       default: [],
     },
@@ -122,7 +104,7 @@ const DecisionSchema = new Schema<IDecisionDocument>(
       enum: ["FLAGGED", "PASSED", "REVIEWING"],
     },
     feedback: {
-      type: FeedbackSchema,
+      type: Schema.Types.Mixed as unknown as Feedback,
       default: undefined,
     },
     reviewedBy: {
