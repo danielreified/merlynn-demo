@@ -67,6 +67,7 @@ export const flexAuth = createMiddleware(async (c, next) => {
     const token = await getToken({
       req: c.req.raw as Parameters<typeof getToken>[0]["req"],
       secret: process.env.AUTH_SECRET,
+      cookieName: "__Secure-authjs.session-token",
     });
     if (token) {
       await next();
