@@ -19,7 +19,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN cd apps/web && bunx next build
+ENV PATH="/app/node_modules/.bin:$PATH"
+RUN cd apps/web && next build
 
 # ---- Stage 3: Production runner (minimal image) ----
 FROM node:22-alpine AS runner
