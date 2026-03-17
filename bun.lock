@@ -82,6 +82,7 @@
         "react-email": "^3.0.0",
       },
       "devDependencies": {
+        "@types/react": "^19.2.14",
         "typescript": "^5.7.0",
       },
     },
