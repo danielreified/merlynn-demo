@@ -6,6 +6,7 @@ COPY package.json bun.lock ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/db/package.json ./packages/db/
 COPY packages/ui/package.json ./packages/ui/
+COPY packages/email/package.json ./packages/email/
 COPY turbo.json tsconfig.base.json ./
 
 RUN CYPRESS_INSTALL_BINARY=0 bun install --frozen-lockfile

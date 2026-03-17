@@ -150,7 +150,7 @@ jobs:
       - run: bun install --frozen-lockfile
 
       - name: Export email previews
-        run: cd packages/email && bun run build && bunx react-email export --outDir out
+        run: cd packages/email && bun run build && bunx react-email export --dir src/templates --outDir out
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
